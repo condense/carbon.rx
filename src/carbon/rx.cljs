@@ -71,6 +71,16 @@
       (clean (reverse @sources)))
     result))
 
+(defn safe-realized? [x]
+  (if (implements? IPending x)
+    (realized? x)
+    true))
+
+(defn fully-realized? [form]
+  (if ((some-fn list? seq? record? coll?) form)
+    (and (safe-realized? form) (every? fully-realized? form))
+    (safe-realized? form)))
+
 (deftype ReactiveExpression [getter setter meta validator ^:mutable drop
                              ^:mutable state ^:mutable watches
                              ^:mutable rank ^:mutable sources ^:mutable sinks]
@@ -108,6 +118,9 @@
                               *rank* r
                               *provenance* (conj *provenance* this)]
                       (getter))]
+      (when ^boolean js/goog.DEBUG
+        (when-not (fully-realized? new-value)
+          (throw (js/Error. "carbon.rx: detected unrealized reactive expression"))))
       (set! rank (inc @r))
       (when (not= old-value new-value)
         (set! state new-value)
